@@ -31,11 +31,11 @@
 
 	function formatDate(ts) {
 		if (!ts?.toDate) return '';
-		return ts.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+		return ts.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 	}
 </script>
 
-<Topbar title="My Paper" breadcrumb={['Dashboard']}>
+<Topbar title="My Papers" breadcrumb={['Dashboard']}>
 	<svelte:fragment slot="actions">
 		<a href="/new" class="btn-primary-md">
 			<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
@@ -52,17 +52,17 @@
 					<circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.5" />
 					<path d="M16 16L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
 				</svg>
-				<input class="text-input pl-11" placeholder="Search paper..." bind:value={search} />
+				<input class="text-input pl-11" placeholder="Search papers..." bind:value={search} />
 			</div>
 		</div>
 	</div>
 
 	{#if loading}
-		<p class="py-16 text-center text-theme-sm text-gray-400">Loading paper...</p>
+		<p class="py-16 text-center text-theme-sm text-gray-400">Loading papers...</p>
 	{:else if filtered.length === 0}
 		<div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-20 text-center dark:border-gray-700">
-			<p class="text-sm font-medium text-gray-700 dark:text-gray-300">No paper yet</p>
-			<p class="mt-1 text-theme-sm text-gray-400">Click on "New Paper" to start.</p>
+			<p class="text-sm font-medium text-gray-700 dark:text-gray-300">No papers yet</p>
+			<p class="mt-1 text-theme-sm text-gray-400">Click "New Paper" to get started.</p>
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">

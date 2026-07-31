@@ -46,7 +46,7 @@
 		editorContent = s?.content ?? '';
 	}
 
-	// Autosave dengan debounce 800ms supaya tidak menulis ke Firestore tiap ketikan
+	// Autosave with an 800ms debounce so we don't write to Firestore on every keystroke
 	function handleInput() {
 		saveStatus = 'saving';
 		clearTimeout(saveTimer);
@@ -58,13 +58,13 @@
 	}
 
 	async function handleAddSection() {
-		const label = prompt('Name of the new section:');
+		const label = prompt('New section name:');
 		if (!label) return;
 		await addSection(projectId, label, sections.length);
 	}
 
 	function statusColor(status) {
-		if (status === 'draf') return 'bg-brand-50 text-brand-600 dark:bg-brand-500/[0.12] dark:text-brand-400';
+		if (status === 'draft') return 'bg-brand-50 text-brand-600 dark:bg-brand-500/[0.12] dark:text-brand-400';
 		return 'bg-gray-100 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400';
 	}
 </script>
@@ -86,7 +86,7 @@
 				<button type="button" class="menu-item w-full {activeId === s.id ? 'menu-item-active' : 'menu-item-inactive'}" on:click={() => selectSection(s.id)}>
 					<span class="flex-1 text-left">{s.label}</span>
 					<span class="rounded-full px-2 py-0.5 text-theme-xs font-medium {statusColor(s.status)}">
-						{s.status === 'draf' ? s.wordCount ?? 0 : '—'}
+						{s.status === 'draft' ? s.wordCount ?? 0 : '—'}
 					</span>
 				</button>
 			{/each}
@@ -94,7 +94,7 @@
 
 		<button class="btn-secondary-outline-md mt-4 w-full justify-center text-theme-sm" on:click={handleAddSection}>
 			<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-			Add section
+			Add Section
 		</button>
 	</aside>
 
@@ -106,10 +106,10 @@
 					<span class="text-theme-xs text-gray-400">
 						{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
 					</span>
-					<div class="flex flex-wrap gap-2" title="Aktif setelah integrasi LLM">
+					<div class="flex flex-wrap gap-2" title="Enabled once LLM integration is added">
 						<button class="btn-primary-sm" disabled>
 							<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1l1.4 3.6L12.5 6l-3.6 1.4L7.5 11l-1.4-3.6L2.5 6l3.6-1.4L7.5 1z" fill="currentColor" /></svg>
-							Create Draft (AI)
+							Generate Draft (AI)
 						</button>
 						<button class="btn-primary-outline-sm" disabled>Expand</button>
 						<button class="btn-primary-outline-sm" disabled>Condense</button>
@@ -121,31 +121,34 @@
 				<textarea
 					id="editor"
 					class="h-full min-h-[420px] w-full resize-none border-0 bg-transparent text-sm leading-7 text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-300"
+					placeholder="Write this section's draft manually. The automatic Generate Draft feature will be enabled once the LLM is integrated."
 					bind:value={editorContent}
 					on:input={handleInput}
 				></textarea>
 			</div>
 
-			<p class="mt-2 text-theme-xs text-gray-400">Changes will be saved after you stopped typing for a while.</p>
+			<p class="mt-2 text-theme-xs text-gray-400">Changes are automatically saved to Firestore shortly after you stop typing.</p>
 		{:else}
-			<p class="text-theme-sm text-gray-400">Loading paper section...</p>
+			<p class="text-theme-sm text-gray-400">Loading paper sections...</p>
 		{/if}
 	</main>
 
 	<aside class="border-l border-gray-200 px-4 py-6 dark:border-gray-800 lg:h-[calc(100vh-73px)] lg:overflow-auto">
 		<p class="mb-3 px-2 text-theme-xs font-semibold uppercase tracking-wide text-gray-400">Sources ({library.length})</p>
 		{#if library.length === 0}
-			<p class="text-theme-sm text-gray-400">No sources yet.</p>
+			<p class="text-theme-sm text-gray-400">No sources yet. Add some from the "New Paper" page, or extend this feature to add them directly here.</p>
 		{:else}
 			<ul class="space-y-2">
 				{#each library as s}
 					<li class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
 						<p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">{s.title}</p>
 						<p class="mt-0.5 text-theme-xs text-gray-400">{s.authors} · {s.year}</p>
-						{#if s.externalUrl}
+						{#if s.fileUrl}
+							<a href={s.fileUrl} target="_blank" rel="noreferrer" class="mt-2 inline-block text-theme-xs text-brand-500 hover:underline">View file</a>
+						{:else if s.externalUrl}
 							<a href={s.externalUrl} target="_blank" rel="noreferrer" class="mt-2 inline-block text-theme-xs text-brand-500 hover:underline">Open link</a>
 						{/if}
-						<button class="ml-3 mt-2 inline-block text-theme-xs text-error-500 hover:underline" on:click={() => deleteSource(projectId, s.id)}>Delete</button>
+						<button class="ml-3 mt-2 inline-block text-theme-xs text-error-500 hover:underline" on:click={() => deleteSource(projectId, s)}>Delete</button>
 					</li>
 				{/each}
 			</ul>
@@ -157,7 +160,7 @@
 	<div class="fixed inset-0 z-999 flex items-center justify-center bg-gray-900/50 px-4" on:click|self={() => (showExport = false)}>
 		<div class="w-full max-w-md rounded-xl bg-white p-6 shadow-theme-lg dark:bg-gray-900">
 			<h3 class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">Export Paper</h3>
-			<p class="mb-5 text-theme-sm text-gray-400">Fitur ekspor akan ada nanti.</p>
+			<p class="mb-5 text-theme-sm text-gray-400">Export functionality will be built once the section data structure is finalized.</p>
 			<div class="flex justify-end">
 				<button class="btn-secondary-outline-md" on:click={() => (showExport = false)}>Close</button>
 			</div>

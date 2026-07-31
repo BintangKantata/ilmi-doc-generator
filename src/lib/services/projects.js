@@ -17,7 +17,7 @@ const DEFAULT_SECTIONS = [
 	{ id: 'abstract', label: 'Abstract', order: 0 },
 	{ id: 'intro', label: 'Introduction', order: 1 },
 	{ id: 'litreview', label: 'Literature Review', order: 2 },
-	{ id: 'method', label: 'Methods', order: 3 },
+	{ id: 'method', label: 'Methodology', order: 3 },
 	{ id: 'result', label: 'Results', order: 4 },
 	{ id: 'discussion', label: 'Discussion', order: 5 },
 	{ id: 'conclusion', label: 'Conclusion', order: 6 }

@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // projects/{projectId}/sources/{fileName}
+    // Info owner project ada di Firestore, bukan di path storage, jadi
+    // aturan ini memastikan minimal: harus login, file PDF, maks 20MB.
+    // Untuk validasi "hanya owner project" yang lebih ketat, tambahkan
+    // Cloud Function trigger di masa mendatang.
+    match /projects/{projectId}/sources/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType.matches('application/pdf');
+    }
+  }
+}

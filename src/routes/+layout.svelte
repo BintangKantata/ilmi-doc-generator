@@ -24,7 +24,7 @@
 </script>
 
 {#if $user === undefined && !isPublic}
-	<!-- Masih menunggu Firebase mengecek status login -->
+	<!-- Still waiting for Firebase to check login status -->
 	<div class="flex h-screen items-center justify-center">
 		<p class="text-sm text-gray-400">Loading...</p>
 	</div>
@@ -32,7 +32,7 @@
 	{#if $user && !isPublic}
 		<div class="flex items-center justify-end gap-3 border-b border-gray-100 bg-white px-6 py-2 text-theme-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900">
 			<span>{$user.email}</span>
-			<button class="text-brand-500 hover:underline" on:click={handleLogout}>Logout</button>
+			<button class="text-brand-500 hover:underline" on:click={handleLogout}>Log out</button>
 		</div>
 	{/if}
 	<slot />

@@ -23,7 +23,7 @@ export async function saveSectionContent(projectId, sectionId, content) {
 	await updateDoc(doc(db, 'projects', projectId, 'sections', sectionId), {
 		content,
 		wordCount,
-		status: content.trim() ? 'draf' : 'kosong',
+		status: content.trim() ? 'draft' : 'empty',
 		updatedAt: serverTimestamp()
 	});
 }
@@ -35,7 +35,7 @@ export async function addSection(projectId, label, order) {
 	await addDoc(collection(db, 'projects', projectId, 'sections'), {
 		label,
 		order,
-		status: 'kosong',
+		status: 'empty',
 		content: '',
 		updatedAt: serverTimestamp()
 	});

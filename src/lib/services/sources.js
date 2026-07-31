@@ -1,5 +1,6 @@
 import { collection, doc, addDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db } from '$lib/firebase.js';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '$lib/firebase.js';
 
 /**
  * Dengerin semua sumber (sources) dari satu project secara real-time.
@@ -14,10 +15,8 @@ export function listenSources(projectId, callback) {
 }
 
 /**
- * Tambah sumber (metadata saja — judul, penulis, tahun, venue).
- * Storage file fisik sengaja tidak dipakai supaya tetap di Firebase plan
- * gratis (Spark). Kalau butuh simpan file PDF, host di layanan terpisah
- * (misal Cloudinary/Supabase Storage free tier) lalu isi `externalUrl`.
+ * Tambah sumber lewat metadata manual (judul, penulis, tahun, venue),
+ * boleh disertai link eksternal (DOI/URL) tanpa upload file.
  */
 export async function addSource(projectId, { title, authors, year, venue, externalUrl = null }) {
 	await addDoc(collection(db, 'projects', projectId, 'sources'), {
@@ -26,10 +25,40 @@ export async function addSource(projectId, { title, authors, year, venue, extern
 		year,
 		venue,
 		externalUrl,
+		fileUrl: null,
 		addedAt: serverTimestamp()
 	});
 }
 
-export async function deleteSource(projectId, sourceId) {
-	await deleteDoc(doc(db, 'projects', projectId, 'sources', sourceId));
+/**
+ * Upload file PDF ke Firebase Storage, lalu simpan metadata + download URL
+ * ke Firestore. Butuh Blaze plan aktif.
+ * Path storage: projects/{projectId}/sources/{timestamp}_{filename}
+ */
+export async function uploadSourceFile(projectId, uid, file) {
+	const path = `projects/${projectId}/sources/${Date.now()}_${file.name}`;
+	const storageRef = ref(storage, path);
+
+	await uploadBytes(storageRef, file, { customMetadata: { uploadedBy: uid } });
+	const fileUrl = await getDownloadURL(storageRef);
+
+	await addDoc(collection(db, 'projects', projectId, 'sources'), {
+		title: file.name,
+		authors: 'Diunggah sendiri',
+		year: '—',
+		venue: 'PDF',
+		externalUrl: null,
+		fileUrl,
+		storagePath: path,
+		addedAt: serverTimestamp()
+	});
+
+	return fileUrl;
+}
+
+export async function deleteSource(projectId, source) {
+	if (source.storagePath) {
+		await deleteObject(ref(storage, source.storagePath)).catch(() => {});
+	}
+	await deleteDoc(doc(db, 'projects', projectId, 'sources', source.id));
 }

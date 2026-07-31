@@ -1,6 +1,7 @@
 {
   "projects": {
-    "paper-ai-firebase": "paper-ai-firebase"
+    "paper-ai-firebase": "paper-ai-firebase",
+    "ilmi-doc-generator": "ilmi-doc-generator"
   },
   "targets": {},
   "etags": {}
