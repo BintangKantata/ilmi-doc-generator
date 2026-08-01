@@ -1,0 +1,16 @@
+Git push:
+cd /c/Users/Lenovo/Documents/paper-ai-firebase
+git add .
+git commit -m "msg here"
+git push
+
+Build & Deploy:
+npm run build
+
+scp -i "/c/Users/Lenovo/Documents/kp2425-2.pem" -r build ubuntu@ec2-18-216-89-123.us-east-2.compute.amazonaws.com:~/build_new
+
+ssh -i "/c/Users/Lenovo/Documents/kp2425-2.pem" ubuntu@ec2-18-216-89-123.us-east-2.compute.amazonaws.com
+
+sudo rm -rf /var/www/html/*
+sudo cp -r ~/build/* /var/www/html/
+sudo systemctl restart nginx

@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import Topbar from '$lib/components/Topbar.svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { getProject } from '$lib/services/projects.js';
 	import { listenSections, saveSectionContent, addSection } from '$lib/services/sections.js';
 	import { listenSources, deleteSource } from '$lib/services/sources.js';
@@ -77,6 +78,10 @@
 		</button>
 	</svelte:fragment>
 </Topbar>
+
+<div class="mx-auto max-w-[1400px] px-6 pt-4">
+	<BackButton fallback="/" />
+</div>
 
 <div class="mx-auto grid max-w-[1400px] grid-cols-1 gap-0 lg:grid-cols-[240px_1fr_320px]">
 	<aside class="border-r border-gray-200 px-4 py-6 dark:border-gray-800 lg:h-[calc(100vh-73px)] lg:overflow-auto">

@@ -2,12 +2,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
 	import { user } from '$lib/stores/auth.js';
-	import { listenProjects } from '$lib/services/projects.js';
+	import { listenProjects, deleteProject } from '$lib/services/projects.js';
 
 	let search = '';
 	let projects = [];
 	let loading = true;
 	let unsubscribe = () => {};
+	let deletingId = null;
 
 	// Tunggu sampai user siap (dari layout), baru pasang listener Firestore
 	$: if ($user) {
@@ -32,6 +33,21 @@
 	function formatDate(ts) {
 		if (!ts?.toDate) return '';
 		return ts.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+	}
+
+	async function handleDelete(e, project) {
+		e.preventDefault();
+		e.stopPropagation();
+		const confirmed = confirm(`Delete "${project.title}"? This cannot be undone.`);
+		if (!confirmed) return;
+		deletingId = project.id;
+		try {
+			await deleteProject(project.id);
+		} catch (err) {
+			alert('Failed to delete: ' + err.message);
+		} finally {
+			deletingId = null;
+		}
 	}
 </script>
 
@@ -69,9 +85,23 @@
 			{#each filtered as p}
 				<a
 					href={`/project/${p.id}`}
-					class="group flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-shadow hover:shadow-theme-md dark:border-gray-800 dark:bg-gray-900"
+					class="group relative flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-shadow hover:shadow-theme-md dark:border-gray-800 dark:bg-gray-900"
 				>
-					<div class="mb-3 flex items-center justify-between">
+					<button
+						type="button"
+						class="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-opacity hover:bg-error-50 hover:text-error-500 group-hover:opacity-100 dark:hover:bg-error-500/[0.12]"
+						title="Delete paper"
+						disabled={deletingId === p.id}
+						on:click={(e) => handleDelete(e, p)}
+					>
+						{#if deletingId === p.id}
+							<svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="animate-spin"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="26" stroke-dashoffset="18" /></svg>
+						{:else}
+							<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2a1 1 0 011-1h1a1 1 0 011 1v1.5M3.5 3.5v8a1 1 0 001 1h5a1 1 0 001-1v-8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+						{/if}
+					</button>
+
+					<div class="mb-3 flex items-center justify-between pr-8">
 						<span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-theme-xs font-medium text-brand-600 dark:bg-brand-500/[0.12] dark:text-brand-400">{p.docType}</span>
 						<span class="text-theme-xs text-gray-400">{formatDate(p.updatedAt)}</span>
 					</div>

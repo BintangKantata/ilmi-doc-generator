@@ -9,7 +9,11 @@
 		{#if breadcrumb.length}
 			<div class="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
 				{#each breadcrumb as crumb, i}
-					<span class:text-gray-800={i === breadcrumb.length - 1} class:dark:text-white={i === breadcrumb.length - 1}>{crumb}</span>
+					{#if crumb === 'Dashboard'}
+						<a href="/" class="hover:text-brand-500 hover:underline" class:text-gray-800={i === breadcrumb.length - 1} class:dark:text-white={i === breadcrumb.length - 1}>{crumb}</a>
+					{:else}
+						<span class:text-gray-800={i === breadcrumb.length - 1} class:dark:text-white={i === breadcrumb.length - 1}>{crumb}</span>
+					{/if}
 					{#if i < breadcrumb.length - 1}
 						<span>/</span>
 					{/if}

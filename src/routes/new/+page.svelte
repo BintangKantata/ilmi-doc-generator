@@ -1,6 +1,7 @@
 <script>
 	import { goto } from '$app/navigation';
 	import Topbar from '$lib/components/Topbar.svelte';
+	import BackButton from '$lib/components/BackButton.svelte';
 	import { user } from '$lib/stores/auth.js';
 	import { createProject } from '$lib/services/projects.js';
 	import { addSource, uploadSourceFile } from '$lib/services/sources.js';
@@ -79,6 +80,8 @@
 <Topbar title="Create New Paper" breadcrumb={['Dashboard', 'New Paper']} />
 
 <main class="mx-auto max-w-4xl px-6 py-8">
+	<BackButton fallback="/" />
+
 	<div class="mb-8 flex items-center gap-4">
 		{#each [{ n: 1, label: 'Topic & Settings' }, { n: 2, label: 'Add Sources' }] as s}
 			<div class="flex items-center gap-2">
