@@ -18,5 +18,22 @@ service cloud.firestore {
           get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
       }
     }
+
+    // Daftar plan/harga -- boleh dibaca siapa saja yang login (dipakai di
+    // halaman /pricing), tapi cuma bisa ditulis manual lewat Console/Admin SDK,
+    // bukan lewat client.
+    match /plans/{planId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Status subscription per user -- HANYA boleh dibaca oleh pemiliknya
+    // sendiri. Penulisan/update status (active/expired/dst) HANYA dilakukan
+    // oleh Cloud Function (webhook Midtrans) lewat Admin SDK, yang otomatis
+    // bypass rules ini -- makanya write dari client selalu ditolak.
+    match /subscriptions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
   }
 }

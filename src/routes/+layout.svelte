@@ -5,12 +5,13 @@
 	import { goto } from '$app/navigation';
 	import { user } from '$lib/stores/auth.js';
 	import { logoutUser } from '$lib/services/auth.js';
+	import SubscriptionBadge from '$lib/components/SubscriptionBadge.svelte';
 
 	const PUBLIC_ROUTES = ['/login'];
 
 	$: isPublic = PUBLIC_ROUTES.includes($page.url.pathname);
 
-	// $user bisa: undefined (belum dicek Firebase), false (tidak login), objek (login)
+	// $user can be: undefined (not checked yet), false (not logged in), object (logged in)
 	$: if ($user === false && !isPublic) {
 		goto('/login');
 	}
@@ -31,6 +32,7 @@
 {:else}
 	{#if $user && !isPublic}
 		<div class="flex items-center justify-end gap-3 border-b border-gray-100 bg-white px-6 py-2 text-theme-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900">
+			<SubscriptionBadge />
 			<span>{$user.email}</span>
 			<button class="text-brand-500 hover:underline" on:click={handleLogout}>Log out</button>
 		</div>

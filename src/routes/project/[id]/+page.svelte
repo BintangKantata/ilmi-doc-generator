@@ -6,6 +6,7 @@
 	import { getProject } from '$lib/services/projects.js';
 	import { listenSections, saveSectionContent, addSection } from '$lib/services/sections.js';
 	import { listenSources, deleteSource } from '$lib/services/sources.js';
+	import { generateDraft, expandText, condenseText } from '$lib/services/llm.js';
 
 	const projectId = $page.params.id;
 
@@ -17,6 +18,9 @@
 	let saveStatus = ''; // '' | 'saving' | 'saved'
 	let showExport = false;
 	let saveTimer;
+
+	let aiAction = null; // null | 'generate' | 'expand' | 'condense'
+	let aiError = '';
 
 	let unsubSections = () => {};
 	let unsubSources = () => {};
@@ -45,6 +49,7 @@
 		activeId = id;
 		const s = sections.find((x) => x.id === id);
 		editorContent = s?.content ?? '';
+		aiError = '';
 	}
 
 	// Autosave with an 800ms debounce so we don't write to Firestore on every keystroke
@@ -67,6 +72,68 @@
 	function statusColor(status) {
 		if (status === 'draft') return 'bg-brand-50 text-brand-600 dark:bg-brand-500/[0.12] dark:text-brand-400';
 		return 'bg-gray-100 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400';
+	}
+
+	async function persistAndSet(newContent) {
+		editorContent = newContent;
+		saveStatus = 'saving';
+		await saveSectionContent(projectId, activeId, editorContent);
+		saveStatus = 'saved';
+		setTimeout(() => (saveStatus = ''), 1500);
+	}
+
+	async function handleGenerateDraft() {
+		if (!active || !project) return;
+		aiError = '';
+		aiAction = 'generate';
+		try {
+			const result = await generateDraft({
+				sectionLabel: active.label,
+				topic: project.topic,
+				citationStyle: project.citationStyle,
+				language: project.language,
+				sources: library
+			});
+			await persistAndSet(result.content);
+		} catch (e) {
+			aiError = e.message || 'Failed to generate draft.';
+		} finally {
+			aiAction = null;
+		}
+	}
+
+	async function handleExpand() {
+		if (!editorContent.trim()) {
+			aiError = 'Write or generate a draft first before expanding it.';
+			return;
+		}
+		aiError = '';
+		aiAction = 'expand';
+		try {
+			const result = await expandText(editorContent, library);
+			await persistAndSet(result.content);
+		} catch (e) {
+			aiError = e.message || 'Failed to expand text.';
+		} finally {
+			aiAction = null;
+		}
+	}
+
+	async function handleCondense() {
+		if (!editorContent.trim()) {
+			aiError = 'Write or generate a draft first before condensing it.';
+			return;
+		}
+		aiError = '';
+		aiAction = 'condense';
+		try {
+			const result = await condenseText(editorContent);
+			await persistAndSet(result.content);
+		} catch (e) {
+			aiError = e.message || 'Failed to condense text.';
+		} finally {
+			aiAction = null;
+		}
 	}
 </script>
 
@@ -111,28 +178,42 @@
 					<span class="text-theme-xs text-gray-400">
 						{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
 					</span>
-					<div class="flex flex-wrap gap-2" title="Enabled once LLM integration is added">
-						<button class="btn-primary-sm" disabled>
+					<div class="flex flex-wrap gap-2">
+						<button class="btn-primary-sm" disabled={aiAction !== null} on:click={handleGenerateDraft}>
 							<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1l1.4 3.6L12.5 6l-3.6 1.4L7.5 11l-1.4-3.6L2.5 6l3.6-1.4L7.5 1z" fill="currentColor" /></svg>
-							Generate Draft (AI)
+							{aiAction === 'generate' ? 'Generating...' : 'Generate Draft (AI)'}
 						</button>
-						<button class="btn-primary-outline-sm" disabled>Expand</button>
-						<button class="btn-primary-outline-sm" disabled>Condense</button>
+						<button class="btn-primary-outline-sm" disabled={aiAction !== null} on:click={handleExpand}>
+							{aiAction === 'expand' ? 'Expanding...' : 'Expand'}
+						</button>
+						<button class="btn-primary-outline-sm" disabled={aiAction !== null} on:click={handleCondense}>
+							{aiAction === 'condense' ? 'Condensing...' : 'Condense'}
+						</button>
 					</div>
 				</div>
 			</div>
+
+			{#if aiError}
+				<div class="mb-4 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-theme-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/[0.08] dark:text-error-400">
+					{aiError}
+				</div>
+			{/if}
 
 			<div class="flex-1 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
 				<textarea
 					id="editor"
 					class="h-full min-h-[420px] w-full resize-none border-0 bg-transparent text-sm leading-7 text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-300"
-					placeholder="Write this section's draft manually. The automatic Generate Draft feature will be enabled once the LLM is integrated."
+					placeholder="Write this section's draft manually, or click 'Generate Draft (AI)' to have Gemini draft it based on your sources."
 					bind:value={editorContent}
 					on:input={handleInput}
+					disabled={aiAction !== null}
 				></textarea>
 			</div>
 
-			<p class="mt-2 text-theme-xs text-gray-400">Changes are automatically saved to Firestore shortly after you stop typing.</p>
+			<p class="mt-2 text-theme-xs text-gray-400">
+				Changes are automatically saved to Firestore shortly after you stop typing. AI-generated citations are based on source
+				titles/authors only -- always verify against the original sources before submitting.
+			</p>
 		{:else}
 			<p class="text-theme-sm text-gray-400">Loading paper sections...</p>
 		{/if}
