@@ -4,3 +4,5 @@ node_modules
 build
 .DS_Store
 paper-ai-firebase-commands.txt
+firebase-debug.log
+firebase-debug.*.log
