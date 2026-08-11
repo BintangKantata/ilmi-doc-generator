@@ -1,8 +1,5 @@
 import { auth } from '$lib/firebase.js';
 
-// URL server Express yang jalan di EC2, di-proxy lewat Nginx path /api/
-// (lihat konfigurasi Nginx di dokumentasi setup). Di lokal (npm run dev),
-// arahkan ke server lokal kalau kamu jalankan server ini juga di lokal.
 const API_BASE = import.meta.env.VITE_LLM_API_BASE || '/api';
 
 async function callApi(path, body) {
@@ -36,23 +33,12 @@ function toSourcePayload(sources) {
 	}));
 }
 
-/**
- * Generate draf awal untuk satu bagian paper.
- * Return: { content, citationsUsed }
- */
-export async function generateDraft({ sectionLabel, topic, citationStyle, language, sources }) {
-	return callApi('/generate-draft', {
-		sectionLabel,
-		topic,
-		citationStyle,
-		language,
-		sources: toSourcePayload(sources)
-	});
+export async function generateFullPaper(projectId) {
+	return callApi('/generate-paper', { projectId });
 }
 
 /**
  * Perluas teks yang sudah ada di editor.
- * Return: { content }
  */
 export async function expandText(currentContent, sources) {
 	return callApi('/expand', {
@@ -63,7 +49,6 @@ export async function expandText(currentContent, sources) {
 
 /**
  * Ringkas teks yang sudah ada di editor.
- * Return: { content }
  */
 export async function condenseText(currentContent) {
 	return callApi('/condense', { currentContent });

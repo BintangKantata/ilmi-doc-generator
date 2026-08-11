@@ -1,8 +1,10 @@
 const express = require('express');
+const admin = require('firebase-admin');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+const db = admin.firestore();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL_NAME = 'gemini-2.5-flash';
@@ -20,52 +22,127 @@ function parseJsonResponse(text) {
 	return JSON.parse(cleaned);
 }
 
-function formatSourcesForPrompt(sources) {
-	if (!sources || sources.length === 0) return '(No sources provided.)';
-	return sources
-		.map((s, i) => `[${i + 1}] ${s.title} - ${s.authors} (${s.year})${s.venue ? `, ${s.venue}` : ''}`)
+/**
+ * Format researchContext + templateValues jadi blok teks yang jelas
+ * untuk dimasukkan ke prompt. Setiap key/value ditulis apa adanya --
+ * inilah "anchor" yang wajib dipakai konsisten di semua bagian paper.
+ */
+function formatContextForPrompt(researchContext, templateValues) {
+	const contextLines = Object.entries(researchContext || {})
+		.map(([k, v]) => `- ${k}: ${v}`)
 		.join('\n');
+	const templateLines = Object.entries(templateValues || {})
+		.map(([k, v]) => `- ${k}: ${v}`)
+		.join('\n');
+
+	return `RESEARCH CONTEXT (canonical facts -- reuse these exact figures/terms consistently across every section):
+${contextLines}
+
+${templateLines ? `ADDITIONAL DETAIL VARIABLES (use where relevant for the matching section):\n${templateLines}` : ''}`;
 }
 
-const CITATION_SAFETY_RULES = `
+const CONSISTENCY_RULES = `
 Critical rules you MUST follow:
-- You are only given the TITLE, AUTHORS, YEAR, and VENUE of each source below -- not their full text.
-- Do NOT invent specific findings, statistics, quotes, or claims and attribute them to a source unless it is a widely known, general fact about that topic.
-- You may reference a source's general subject matter (based on its title) to support a general statement, citing it as [n].
-- NEVER invent a citation number that is not in the provided source list.
-- If you cannot support a claim with the given sources or general knowledge, write it without a citation rather than fabricating one, or omit the claim entirely.
-- Do not fabricate DOIs, page numbers, or direct quotes.
+- Use ONLY the facts, figures, and terms given in the context below. Do NOT invent new numbers, statistics, or claims not present in the context.
+- Reuse the exact same numbers/terminology across every section for consistency (e.g. if accuracy is 94.2% in one section, it must be 94.2% everywhere it's mentioned, never a different number).
+- Do not fabricate citations, DOIs, or references to external papers that were not provided.
+- If a section needs information not present in the context, write in general terms appropriate for an academic paper rather than inventing specifics.
 `;
 
-router.post('/generate-draft', requireAuth, async (req, res) => {
-	const { sectionLabel, topic, citationStyle, language, sources } = req.body;
-	if (!sectionLabel || !topic) {
-		return res.status(400).json({ error: 'sectionLabel and topic are required.' });
+/**
+ * generatePaper -- generate SELURUH bagian paper sekaligus dalam satu
+ * pemanggilan Gemini, berdasarkan researchContext + templateValues yang
+ * disimpan di project. Hasilnya langsung ditulis ke Firestore
+ * (projects/{id}/sections/{sectionId}) lewat Admin SDK, supaya frontend
+ * cukup dengerin realtime listener yang sudah ada -- tidak perlu logic
+ * tambahan di client selain memanggil endpoint ini.
+ *
+ * Input:  { projectId }
+ * Output: { sections: [{ id, label, wordCount }] }
+ */
+router.post('/generate-paper', requireAuth, async (req, res) => {
+	const { projectId } = req.body;
+	if (!projectId) {
+		return res.status(400).json({ error: 'projectId is required.' });
 	}
 
-	const prompt = `You are an academic writing assistant helping draft a section of a research paper.
+	const projectSnap = await db.doc(`projects/${projectId}`).get();
+	if (!projectSnap.exists) {
+		return res.status(404).json({ error: 'Project not found.' });
+	}
+	const project = projectSnap.data();
 
-Section: "${sectionLabel}"
-Paper topic / research question: "${topic}"
-Citation style: ${citationStyle || 'APA 7th'}
-Write in: ${language || 'English'}
+	if (project.ownerId !== req.uid) {
+		return res.status(403).json({ error: 'You do not have access to this project.' });
+	}
 
-Available sources (cite using [n] matching the number below):
-${formatSourcesForPrompt(sources)}
+	if (!project.researchContext) {
+		return res.status(400).json({ error: 'This project has no research context set. Fill it in before generating.' });
+	}
 
-${CITATION_SAFETY_RULES}
+	const sectionsSnap = await db.collection(`projects/${projectId}/sections`).orderBy('order', 'asc').get();
+	const sections = sectionsSnap.docs.map((d) => ({ id: d.id, label: d.data().label }));
 
-Write a well-structured academic paragraph (150-300 words) for this section. Respond ONLY with valid JSON, no markdown fences, in this exact shape:
-{"content": "the paragraph text with [n] citation markers", "citationsUsed": [1, 2]}`;
+	if (sections.length === 0) {
+		return res.status(400).json({ error: 'This project has no sections defined.' });
+	}
 
+	const sectionListForPrompt = sections.map((s) => `"${s.id}": "${s.label}"`).join(', ');
+
+	const prompt = `You are an academic writing assistant. Write a COMPLETE research paper draft, one paragraph per section, based STRICTLY on the research context below.
+
+${formatContextForPrompt(project.researchContext, project.templateValues)}
+
+Paper settings:
+- Citation style: ${project.citationStyle || 'APA 7th'}
+- Write in: ${project.language || 'English'}
+
+${CONSISTENCY_RULES}
+
+Write one well-developed academic paragraph (150-350 words) for EACH of these sections: {${sectionListForPrompt}}.
+
+Respond ONLY with valid JSON, no markdown fences, where each key is the exact section id given above and each value is that section's paragraph text. Example shape:
+{"abstract": "...", "intro": "..."}`;
+
+	let parsed;
 	try {
 		const result = await getModel().generateContent(prompt);
-		const parsed = parseJsonResponse(result.response.text());
-		res.json({ content: parsed.content || '', citationsUsed: parsed.citationsUsed || [] });
+		parsed = parseJsonResponse(result.response.text());
 	} catch (err) {
-		console.error('generate-draft error:', err);
-		res.status(500).json({ error: 'Failed to generate draft.' });
+		console.error('generate-paper error:', err);
+		return res.status(500).json({ error: 'Failed to generate the paper from Gemini.' });
 	}
+
+	const batch = db.batch();
+	const updatedSections = [];
+
+	for (const s of sections) {
+		const content = parsed[s.id];
+		if (!content) continue;
+		const wordCount = content.trim().split(/\s+/).length;
+		batch.set(
+			db.doc(`projects/${projectId}/sections/${s.id}`),
+			{
+				content,
+				wordCount,
+				status: 'draft',
+				updatedAt: admin.firestore.FieldValue.serverTimestamp()
+			},
+			{ merge: true }
+		);
+		updatedSections.push({ id: s.id, label: s.label, wordCount });
+	}
+
+	const progress = Math.round((updatedSections.length / sections.length) * 100);
+	batch.set(
+		db.doc(`projects/${projectId}`),
+		{ progress, paperGenerated: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+		{ merge: true }
+	);
+
+	await batch.commit();
+
+	res.json({ sections: updatedSections });
 });
 
 router.post('/expand', requireAuth, async (req, res) => {
@@ -74,12 +151,17 @@ router.post('/expand', requireAuth, async (req, res) => {
 		return res.status(400).json({ error: 'currentContent is required.' });
 	}
 
-	const prompt = `You are an academic writing assistant. Expand the following paragraph with more detail and depth, without changing its core meaning or removing any existing [n] citations.
+	const sourceList =
+		sources && sources.length
+			? sources.map((s, i) => `[${i + 1}] ${s.title} - ${s.authors} (${s.year})${s.venue ? `, ${s.venue}` : ''}`).join('\n')
+			: '(No sources provided.)';
+
+	const prompt = `You are an academic writing assistant. Expand the following paragraph with more detail and depth, without changing its core meaning or removing any existing [n] citations or figures.
 
 Available sources (for any NEW citations you add, cite using [n] matching the number below):
-${formatSourcesForPrompt(sources)}
+${sourceList}
 
-${CITATION_SAFETY_RULES}
+Do NOT invent new statistics or facts not implied by the text or sources above.
 
 Current paragraph:
 """
@@ -105,7 +187,7 @@ router.post('/condense', requireAuth, async (req, res) => {
 		return res.status(400).json({ error: 'currentContent is required.' });
 	}
 
-	const prompt = `You are an academic writing assistant. Condense the following paragraph to be more concise, while preserving its core meaning and KEEPING every [n] citation marker that appears in the original text -- do not remove any citation.
+	const prompt = `You are an academic writing assistant. Condense the following paragraph to be more concise, while preserving its core meaning and KEEPING every [n] citation marker and every figure/number that appears in the original text -- do not remove or alter any of them.
 
 Current paragraph:
 """
