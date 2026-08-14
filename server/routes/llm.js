@@ -2,6 +2,7 @@ const express = require('express');
 const admin = require('firebase-admin');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { requireAuth } = require('../middleware/auth');
+const { getPromptTemplate } = require('../services/promptTemplates');
 
 const router = express.Router();
 const db = admin.firestore();
@@ -41,21 +42,13 @@ ${contextLines}
 ${templateLines ? `ADDITIONAL DETAIL VARIABLES (use where relevant for the matching section):\n${templateLines}` : ''}`;
 }
 
-const CONSISTENCY_RULES = `
-Critical rules you MUST follow:
-- Use ONLY the facts, figures, and terms given in the context below. Do NOT invent new numbers, statistics, or claims not present in the context.
-- Reuse the exact same numbers/terminology across every section for consistency (e.g. if accuracy is 94.2% in one section, it must be 94.2% everywhere it's mentioned, never a different number).
-- Do not fabricate citations, DOIs, or references to external papers that were not provided.
-- If a section needs information not present in the context, write in general terms appropriate for an academic paper rather than inventing specifics.
-`;
-
 /**
  * generatePaper -- generate SELURUH bagian paper sekaligus dalam satu
  * pemanggilan Gemini, berdasarkan researchContext + templateValues yang
- * disimpan di project. Hasilnya langsung ditulis ke Firestore
- * (projects/{id}/sections/{sectionId}) lewat Admin SDK, supaya frontend
- * cukup dengerin realtime listener yang sudah ada -- tidak perlu logic
- * tambahan di client selain memanggil endpoint ini.
+ * disimpan di project, DAN prompt template sesuai docType project
+ * (dari collection Firestore `promptTemplates`). Hasilnya langsung
+ * ditulis ke Firestore (projects/{id}/sections/{sectionId}) lewat Admin
+ * SDK, supaya frontend cukup dengerin realtime listener yang sudah ada.
  *
  * Input:  { projectId }
  * Output: { sections: [{ id, label, wordCount }] }
@@ -87,19 +80,24 @@ router.post('/generate-paper', requireAuth, async (req, res) => {
 		return res.status(400).json({ error: 'This project has no sections defined.' });
 	}
 
+	const template = await getPromptTemplate(project.docType);
 	const sectionListForPrompt = sections.map((s) => `"${s.id}": "${s.label}"`).join(', ');
+	const wordRange = template.sectionWordRange || { min: 150, max: 350 };
 
-	const prompt = `You are an academic writing assistant. Write a COMPLETE research paper draft, one paragraph per section, based STRICTLY on the research context below.
+	const prompt = `${template.systemInstruction}
+
+Write a COMPLETE research paper draft, one paragraph per section, based STRICTLY on the research context below.
 
 ${formatContextForPrompt(project.researchContext, project.templateValues)}
 
 Paper settings:
+- Document type: ${project.docType || 'Academic Journal'}
 - Citation style: ${project.citationStyle || 'APA 7th'}
 - Write in: ${project.language || 'English'}
 
-${CONSISTENCY_RULES}
+${template.consistencyRules}
 
-Write one well-developed academic paragraph (150-350 words) for EACH of these sections: {${sectionListForPrompt}}.
+Write one well-developed academic paragraph (${wordRange.min}-${wordRange.max} words) for EACH of these sections: {${sectionListForPrompt}}.
 
 Respond ONLY with valid JSON, no markdown fences, where each key is the exact section id given above and each value is that section's paragraph text. Example shape:
 {"abstract": "...", "intro": "..."}`;

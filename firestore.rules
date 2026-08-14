@@ -35,5 +35,16 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    // Template prompt per docType (Academic Journal, Thesis, dll).
+    // Cuma dibaca oleh backend lewat Admin SDK (bypass rules ini), tapi
+    // dibuka read untuk user login juga jaga-jaga kalau nanti frontend
+    // perlu preview/tampilkan info template. Write cuma manual lewat
+    // Console atau script seed (server/scripts/seedPromptTemplates.js),
+    // tidak pernah lewat client.
+    match /promptTemplates/{templateId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }
