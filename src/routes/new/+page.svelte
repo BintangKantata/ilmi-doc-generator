@@ -3,12 +3,13 @@
 	import Topbar from '$lib/components/Topbar.svelte';
 	import BackButton from '$lib/components/BackButton.svelte';
 	import { user } from '$lib/stores/auth.js';
+	import { t } from '$lib/i18n';
 	import { createProject } from '$lib/services/projects.js';
 	import { addSource } from '$lib/services/sources.js';
 
 	let creating = false;
 
-	// ---- Research Context (wajib -- ini "anchor" konsistensi AI) ----
+	// ---- Research Context (required -- this is the AI's consistency anchor) ----
 	let ctx = {
 		domain: '',
 		problem: '',
@@ -23,28 +24,32 @@
 		contribution: ''
 	};
 
-	const CONTEXT_FIELDS = [
-		{ key: 'domain', label: 'Research domain', placeholder: 'e.g. deep learning-based agricultural image classification' },
-		{ key: 'problem', label: 'Problem', placeholder: 'e.g. unstable disease classification under visual variation' },
-		{ key: 'existing_solution', label: 'Existing solution', placeholder: 'e.g. simple 3-layer CNN and transfer learning without fine-tuning' },
-		{ key: 'limitation', label: 'Limitation of existing solution', placeholder: 'e.g. prediction quality and efficiency not evaluated uniformly' },
-		{ key: 'proposed_solution', label: 'Proposed solution', placeholder: 'e.g. comparative classification pipeline' },
-		{ key: 'method', label: 'Method(s) used', placeholder: 'e.g. MobileNetV2 and ResNet50' },
-		{ key: 'dataset', label: 'Dataset', placeholder: 'e.g. 2,400 synthetic leaf images across 4 balanced classes' },
-		{ key: 'evaluation_metric', label: 'Evaluation metric', placeholder: 'e.g. accuracy as the primary metric' },
-		{ key: 'baseline', label: 'Baseline', placeholder: 'e.g. simple 3-layer CNN with 78.0% accuracy' },
-		{ key: 'result', label: 'Result', placeholder: 'e.g. accuracy improved from 78.0% to 94.2% with ResNet50' },
-		{ key: 'contribution', label: 'Contribution', placeholder: 'e.g. comparative evaluation of accuracy and efficiency' }
+	// Field order + English placeholders (illustrative examples -- kept in
+	// English regardless of UI language, since they're just examples).
+	// Labels come from $t.newProject.contextFields at render time.
+	const CONTEXT_FIELD_KEYS = [
+		{ key: 'domain', placeholder: 'e.g. deep learning-based agricultural image classification', wide: true },
+		{ key: 'problem', placeholder: 'e.g. unstable disease classification under visual variation', wide: true },
+		{ key: 'existing_solution', placeholder: 'e.g. simple 3-layer CNN and transfer learning without fine-tuning' },
+		{ key: 'limitation', placeholder: 'e.g. prediction quality and efficiency not evaluated uniformly' },
+		{ key: 'proposed_solution', placeholder: 'e.g. comparative classification pipeline' },
+		{ key: 'method', placeholder: 'e.g. MobileNetV2 and ResNet50' },
+		{ key: 'dataset', placeholder: 'e.g. 2,400 synthetic leaf images across 4 balanced classes' },
+		{ key: 'evaluation_metric', placeholder: 'e.g. accuracy as the primary metric' },
+		{ key: 'baseline', placeholder: 'e.g. simple 3-layer CNN with 78.0% accuracy' },
+		{ key: 'result', placeholder: 'e.g. accuracy improved from 78.0% to 94.2% with ResNet50' },
+		{ key: 'contribution', placeholder: 'e.g. comparative evaluation of accuracy and efficiency' }
 	];
 
-	$: contextComplete = CONTEXT_FIELDS.every((f) => ctx[f.key].trim());
+	$: contextComplete = CONTEXT_FIELD_KEYS.every((f) => ctx[f.key].trim());
 
 	// ---- Settings ----
 	let docType = 'Academic Journal';
 	let citationStyle = 'APA 7th';
 	let language = 'English';
 
-	// ---- Details (optional) -- same shape as template_values, grouped ----
+	// ---- Details (optional) -- labels stay in English (advanced/optional
+	// fields); group titles are translated via $t.newProject.detailGroups ----
 	let details = {
 		novelty: '', method_detail: '', training_configuration: '', research_goal: '', research_object: '', contribution_detail: '',
 		existing_condition: '', challenge: '', main_problem: '', problem_impact: '', prior_solution: '', prior_strength: '', prior_limitation: '', proposed_solution_detail: '', improved_aspect: '',
@@ -57,11 +62,6 @@
 		impact_domain: '', impact_technology: '', practical_impact: '', impact_service_availability: '', impact_problem_evidence: '', impact_limitation: '', impact_result: '', accessibility_impact: '', target_users: ''
 	};
 
-	// Key yang dikirim ke backend dipetakan balik ke nama asli (tanpa
-	// suffix "_detail") supaya konsisten dengan format template_values,
-	// karena beberapa nama field sama dengan yang ada di Research Context
-	// (method, contribution, proposed_solution, limitation) tapi butuh
-	// input terpisah di sini.
 	const DETAIL_KEY_MAP = {
 		method_detail: 'method',
 		contribution_detail: 'contribution',
@@ -71,7 +71,7 @@
 
 	const DETAIL_GROUPS = [
 		{
-			title: 'Novelty & Approach',
+			titleKey: 'novelty',
 			fields: [
 				{ key: 'novelty', label: 'Novelty', placeholder: 'e.g. Comparison of Lightweight and Residual Architectures' },
 				{ key: 'method_detail', label: 'Method (detailed)', placeholder: 'e.g. MobileNetV2 and ResNet50' },
@@ -82,7 +82,7 @@
 			]
 		},
 		{
-			title: 'Problem & Motivation',
+			titleKey: 'problem',
 			fields: [
 				{ key: 'existing_condition', label: 'Existing condition', placeholder: 'e.g. disease identification still relies on visual observation' },
 				{ key: 'challenge', label: 'Challenge', placeholder: 'e.g. leaf color variation, symptom similarity, lighting changes' },
@@ -96,7 +96,7 @@
 			]
 		},
 		{
-			title: 'Results Summary',
+			titleKey: 'results',
 			fields: [
 				{ key: 'research_result', label: 'Research result', placeholder: 'e.g. ResNet50 reached 94.2%, MobileNetV2 92.5% accuracy' },
 				{ key: 'result_improvement', label: 'Result improvement', placeholder: 'e.g. 16.2 points for ResNet50, 14.5 points for MobileNetV2' },
@@ -105,7 +105,7 @@
 			]
 		},
 		{
-			title: 'Application & Context',
+			titleKey: 'application',
 			fields: [
 				{ key: 'application_domain', label: 'Application domain', placeholder: 'e.g. mobile-based plant disease identification support system' },
 				{ key: 'surprising_statistic', label: 'Surprising statistic', placeholder: 'e.g. 18% of images showed symptoms in an annual monitoring simulation' },
@@ -115,7 +115,7 @@
 			]
 		},
 		{
-			title: 'Research Design',
+			titleKey: 'design',
 			fields: [
 				{ key: 'research_type', label: 'Research type', placeholder: 'e.g. controlled comparative experiment using synthetic data' },
 				{ key: 'evaluated_variable', label: 'Evaluated variable', placeholder: 'e.g. classification performance, model size, inference time' },
@@ -127,7 +127,7 @@
 			]
 		},
 		{
-			title: 'Metrics & Results Detail',
+			titleKey: 'metrics',
 			fields: [
 				{ key: 'metric_name', label: 'Metric name', placeholder: 'e.g. accuracy' },
 				{ key: 'evaluation_metrics', label: 'Evaluation metrics', placeholder: 'e.g. accuracy, macro precision/recall/F1, confusion matrix' },
@@ -139,7 +139,7 @@
 			]
 		},
 		{
-			title: 'Statistical Analysis',
+			titleKey: 'statistics',
 			fields: [
 				{ key: 'statistical_result', label: 'Statistical result', placeholder: 'e.g. difference confirmed significant by paired t-test' },
 				{ key: 'statistical_variable_1', label: 'Statistical variable 1', placeholder: 'e.g. MobileNetV2 accuracy' },
@@ -151,7 +151,7 @@
 			]
 		},
 		{
-			title: 'Practical Application & Limitations',
+			titleKey: 'practical',
 			fields: [
 				{ key: 'practical_application', label: 'Practical application', placeholder: 'e.g. early screening of leaf images before expert review' },
 				{ key: 'limitation_detail', label: 'Limitation (detailed)', placeholder: 'e.g. balanced synthetic dataset, single inference environment' },
@@ -159,7 +159,7 @@
 			]
 		},
 		{
-			title: 'Impact',
+			titleKey: 'impact',
 			fields: [
 				{ key: 'impact_domain', label: 'Impact domain', placeholder: 'e.g. decision support system for rice plant monitoring' },
 				{ key: 'impact_technology', label: 'Impact technology', placeholder: 'e.g. deep learning-based image classification system' },
@@ -174,7 +174,7 @@
 		}
 	];
 
-	// ---- Sources (opsional) ----
+	// ---- Sources (optional) ----
 	let manualTitle = '';
 	let manualAuthors = '';
 	let manualYear = '';
@@ -212,7 +212,7 @@
 
 			goto(`/project/${projectId}`);
 		} catch (e) {
-			alert('Failed to create project: ' + e.message);
+			alert($t.newProject.createFailed + e.message);
 			creating = false;
 		}
 	}
@@ -233,22 +233,20 @@
 	}
 </script>
 
-<Topbar title="Create New Paper" breadcrumb={['Dashboard', 'New Paper']} />
+<Topbar title={$t.newProject.title} breadcrumb={[$t.common.dashboard, $t.newProject.breadcrumb]} />
 
 <main class="mx-auto max-w-4xl px-6 py-8">
 	<BackButton fallback="/" />
 
 	<!-- ============ Research Context (required) ============ -->
 	<div class="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">Research Context</p>
-		<p class="mb-5 text-theme-sm text-gray-400">
-			These fields anchor the AI's writing -- every fact and figure here will be reused consistently across the entire generated paper. All fields are required.
-		</p>
+		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">{$t.newProject.researchContextTitle}</p>
+		<p class="mb-5 text-theme-sm text-gray-400">{$t.newProject.researchContextDesc}</p>
 
 		<div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-			{#each CONTEXT_FIELDS as f}
-				<div class="form-groups {f.key === 'domain' || f.key === 'problem' ? 'sm:col-span-2' : ''}">
-					<label class="form-label" for={f.key}>{f.label}</label>
+			{#each CONTEXT_FIELD_KEYS as f}
+				<div class="form-groups {f.wide ? 'sm:col-span-2' : ''}">
+					<label class="form-label" for={f.key}>{$t.newProject.contextFields[f.key]}</label>
 					<textarea id={f.key} rows="2" class="text-input h-auto resize-none py-2.5" placeholder={f.placeholder} bind:value={ctx[f.key]}></textarea>
 				</div>
 			{/each}
@@ -256,16 +254,17 @@
 
 		<div class="mt-6 grid grid-cols-1 gap-5 border-t border-gray-100 pt-6 dark:border-gray-800 sm:grid-cols-3">
 			<div class="form-groups">
-				<label class="form-label" for="docType">Document type</label>
+				<label class="form-label" for="docType">{$t.newProject.docType}</label>
 				<select id="docType" class="select-input" bind:value={docType}>
 					<option>Academic Journal</option>
 					<option>Thesis / Dissertation</option>
 					<option>Literature Review</option>
 					<option>Research Report</option>
+					<option>IEEE Transactions Journal</option>
 				</select>
 			</div>
 			<div class="form-groups">
-				<label class="form-label" for="style">Citation style</label>
+				<label class="form-label" for="style">{$t.newProject.citationStyle}</label>
 				<select id="style" class="select-input" bind:value={citationStyle}>
 					<option>APA 7th</option>
 					<option>MLA 9th</option>
@@ -275,27 +274,26 @@
 				</select>
 			</div>
 			<div class="form-groups">
-				<label class="form-label" for="lang">Writing language</label>
+				<label class="form-label" for="lang">{$t.newProject.writingLanguage}</label>
 				<select id="lang" class="select-input" bind:value={language}>
 					<option>English</option>
 					<option>Indonesian</option>
 				</select>
 			</div>
 		</div>
+		<p class="mt-3 text-theme-xs text-gray-400">{$t.newProject.writingLanguageHint}</p>
 	</div>
 
 	<!-- ============ Details (optional) ============ -->
 	<div class="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">Details <span class="font-normal text-gray-400">(optional)</span></p>
-		<p class="mb-5 text-theme-sm text-gray-400">
-			Extra per-paragraph detail the AI can use where relevant. Leave any field blank to skip it -- nothing here is required.
-		</p>
+		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">{$t.newProject.detailsTitle} <span class="font-normal text-gray-400">({$t.common.optional})</span></p>
+		<p class="mb-5 text-theme-sm text-gray-400">{$t.newProject.detailsDesc}</p>
 
 		<div class="space-y-2">
 			{#each DETAIL_GROUPS as group}
 				<details class="group rounded-lg border border-gray-200 dark:border-gray-800">
 					<summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-						{group.title}
+						{$t.newProject.detailGroups[group.titleKey]}
 						<svg class="text-gray-400 transition-transform group-open:rotate-180" width="16" height="16" viewBox="0 0 16 16" fill="none">
 							<path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
 						</svg>
@@ -315,18 +313,18 @@
 
 	<!-- ============ Sources (optional) ============ -->
 	<div class="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">Sources <span class="font-normal text-gray-400">(optional)</span></p>
-		<p class="mb-5 text-theme-sm text-gray-400">You can also add sources later from the editor page.</p>
+		<p class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">{$t.newProject.sourcesTitle} <span class="font-normal text-gray-400">({$t.common.optional})</span></p>
+		<p class="mb-5 text-theme-sm text-gray-400">{$t.newProject.sourcesDesc}</p>
 
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-			<input class="text-input" placeholder="Source title" bind:value={manualTitle} />
-			<input class="text-input" placeholder="Authors" bind:value={manualAuthors} />
-			<input class="text-input" placeholder="Year" bind:value={manualYear} />
-			<input class="text-input" placeholder="Venue/Journal" bind:value={manualVenue} />
-			<input class="text-input sm:col-span-2" placeholder="Source link (optional)" bind:value={manualLink} />
+			<input class="text-input" placeholder={$t.newProject.sourceTitlePlaceholder} bind:value={manualTitle} />
+			<input class="text-input" placeholder={$t.newProject.authorsPlaceholder} bind:value={manualAuthors} />
+			<input class="text-input" placeholder={$t.newProject.yearPlaceholder} bind:value={manualYear} />
+			<input class="text-input" placeholder={$t.newProject.venuePlaceholder} bind:value={manualVenue} />
+			<input class="text-input sm:col-span-2" placeholder={$t.newProject.linkPlaceholder} bind:value={manualLink} />
 		</div>
 		<button class="btn-primary-outline-sm mt-3 w-full justify-center" on:click={addManualSource} disabled={!manualTitle.trim()}>
-			Add Source
+			{$t.newProject.addSource}
 		</button>
 
 		{#if addedSources.length > 0}
@@ -340,7 +338,7 @@
 
 	<div class="mt-6 flex justify-end">
 		<button class="btn-primary-md" disabled={!contextComplete || creating} on:click={handleCreate}>
-			{creating ? 'Creating...' : 'Create Paper'}
+			{creating ? $t.newProject.creating : $t.newProject.createPaper}
 			<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
 		</button>
 	</div>

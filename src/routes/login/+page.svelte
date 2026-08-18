@@ -1,5 +1,6 @@
 <script>
 	import { loginUser, registerUser } from '$lib/services/auth.js';
+	import { t } from '$lib/i18n';
 
 	let mode = 'login'; // 'login' | 'register'
 	let email = '';
@@ -26,32 +27,32 @@
 
 	function mapError(code) {
 		const map = {
-			'auth/email-already-in-use': 'This email is already registered.',
-			'auth/invalid-email': 'Invalid email format.',
-			'auth/weak-password': 'Password must be at least 6 characters.',
-			'auth/invalid-credential': 'Incorrect email or password.',
-			'auth/user-not-found': 'Incorrect email or password.',
-			'auth/wrong-password': 'Incorrect email or password.'
+			'auth/email-already-in-use': $t.login.errors.emailInUse,
+			'auth/invalid-email': $t.login.errors.invalidEmail,
+			'auth/weak-password': $t.login.errors.weakPassword,
+			'auth/invalid-credential': $t.login.errors.wrongCredentials,
+			'auth/user-not-found': $t.login.errors.wrongCredentials,
+			'auth/wrong-password': $t.login.errors.wrongCredentials
 		};
-		return map[code] || 'Something went wrong, please try again.';
+		return map[code] || $t.login.errors.generic;
 	}
 </script>
 
 <main class="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
 	<div class="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
 		<h1 class="mb-1 text-theme-lg font-semibold text-gray-800 dark:text-white/90">
-			{mode === 'login' ? 'Sign In' : 'Create Account'}
+			{mode === 'login' ? $t.login.signIn : $t.login.createAccount}
 		</h1>
-		<p class="mb-5 text-theme-sm text-gray-400">AI Paper Generator</p>
+		<p class="mb-5 text-theme-sm text-gray-400">{$t.login.tagline}</p>
 
 		<form class="space-y-4" on:submit|preventDefault={handleSubmit}>
 			<div class="form-groups">
-				<label class="form-label" for="email">Email</label>
-				<input id="email" type="email" required class="text-input" bind:value={email} placeholder="name@email.com" />
+				<label class="form-label" for="email">{$t.login.email}</label>
+				<input id="email" type="email" required class="text-input" bind:value={email} placeholder={$t.login.emailPlaceholder} />
 			</div>
 			<div class="form-groups">
-				<label class="form-label" for="password">Password</label>
-				<input id="password" type="password" required minlength="6" class="text-input" bind:value={password} placeholder="At least 6 characters" />
+				<label class="form-label" for="password">{$t.login.password}</label>
+				<input id="password" type="password" required minlength="6" class="text-input" bind:value={password} placeholder={$t.login.passwordPlaceholder} />
 			</div>
 
 			{#if error}
@@ -59,17 +60,17 @@
 			{/if}
 
 			<button type="submit" class="btn-primary-md w-full justify-center" disabled={loading}>
-				{loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
+				{loading ? $t.login.processing : mode === 'login' ? $t.login.signIn : $t.login.signUp}
 			</button>
 		</form>
 
 		<p class="mt-5 text-center text-theme-sm text-gray-400">
 			{#if mode === 'login'}
-				Don't have an account?
-				<button class="font-medium text-brand-500 hover:underline" on:click={() => (mode = 'register')}>Sign Up</button>
+				{$t.login.noAccount}
+				<button class="font-medium text-brand-500 hover:underline" on:click={() => (mode = 'register')}>{$t.login.signUp}</button>
 			{:else}
-				Already have an account?
-				<button class="font-medium text-brand-500 hover:underline" on:click={() => (mode = 'login')}>Sign In</button>
+				{$t.login.haveAccount}
+				<button class="font-medium text-brand-500 hover:underline" on:click={() => (mode = 'login')}>{$t.login.signIn}</button>
 			{/if}
 		</p>
 	</div>

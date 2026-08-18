@@ -1,19 +1,22 @@
 <script>
+	import { locale } from '$lib/stores/locale.js';
+	import { t } from '$lib/i18n';
+
 	export let plan;
 	export let isCurrent = false;
 	export let loading = false;
 	export let onSubscribe = () => {};
 
 	function formatPrice(amount, currency) {
-		if (!amount) return 'Free';
-		return new Intl.NumberFormat('id-ID', { style: 'currency', currency: currency || 'IDR', maximumFractionDigits: 0 }).format(amount);
+		if (!amount) return $t.pricing.free;
+		return new Intl.NumberFormat($locale === 'id' ? 'id-ID' : 'en-US', { style: 'currency', currency: currency || 'IDR', maximumFractionDigits: 0 }).format(amount);
 	}
 </script>
 
 <div class="flex flex-col rounded-xl border p-6 {isCurrent ? 'border-brand-500 shadow-theme-md' : 'border-gray-200 dark:border-gray-800'} bg-white dark:bg-gray-900">
 	{#if isCurrent}
 		<span class="mb-3 inline-flex w-fit items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-theme-xs font-medium text-brand-600 dark:bg-brand-500/[0.12] dark:text-brand-400">
-			Current Plan
+			{$t.pricing.currentPlan}
 		</span>
 	{/if}
 
@@ -23,7 +26,7 @@
 	<div class="mt-4">
 		<span class="text-2xl font-bold text-gray-800 dark:text-white/90">{formatPrice(plan.price, plan.currency)}</span>
 		{#if plan.price}
-			<span class="text-theme-sm text-gray-400">/{plan.interval === 'year' ? 'year' : 'month'}</span>
+			<span class="text-theme-sm text-gray-400">{plan.interval === 'year' ? $t.pricing.perYear : $t.pricing.perMonth}</span>
 		{/if}
 	</div>
 
@@ -39,12 +42,12 @@
 	</ul>
 
 	{#if isCurrent}
-		<button class="btn-secondary-outline-md w-full justify-center" disabled>Active</button>
+		<button class="btn-secondary-outline-md w-full justify-center" disabled>{$t.pricing.active}</button>
 	{:else if plan.price === 0}
-		<button class="btn-secondary-outline-md w-full justify-center" disabled>Default plan</button>
+		<button class="btn-secondary-outline-md w-full justify-center" disabled>{$t.pricing.defaultPlan}</button>
 	{:else}
 		<button class="btn-primary-md w-full justify-center" disabled={loading} on:click={() => onSubscribe(plan)}>
-			{loading ? 'Processing...' : 'Subscribe'}
+			{loading ? $t.pricing.processing : $t.pricing.subscribe}
 		</button>
 	{/if}
 </div>

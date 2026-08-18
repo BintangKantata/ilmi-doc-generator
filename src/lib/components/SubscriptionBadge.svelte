@@ -1,6 +1,7 @@
 <script>
 	import { onDestroy } from 'svelte';
 	import { user } from '$lib/stores/auth.js';
+	import { t } from '$lib/i18n';
 	import { listenSubscription } from '$lib/services/subscriptions.js';
 
 	let subscription = null;
@@ -14,7 +15,7 @@
 	onDestroy(() => unsubscribe());
 
 	$: isActive = subscription?.status === 'active';
-	$: label = isActive ? subscription.planName ?? 'Pro' : 'Free plan';
+	$: label = isActive ? subscription.planName ?? $t.subscriptionBadge.proFallback : $t.subscriptionBadge.freePlan;
 </script>
 
 <a

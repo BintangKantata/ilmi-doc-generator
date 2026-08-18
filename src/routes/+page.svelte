@@ -1,7 +1,9 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
 	import { user } from '$lib/stores/auth.js';
+	import { locale } from '$lib/stores/locale.js';
+	import { t } from '$lib/i18n';
 	import { listenProjects, deleteProject } from '$lib/services/projects.js';
 
 	let search = '';
@@ -10,7 +12,6 @@
 	let unsubscribe = () => {};
 	let deletingId = null;
 
-	// Tunggu sampai user siap (dari layout), baru pasang listener Firestore
 	$: if ($user) {
 		unsubscribe();
 		loading = true;
@@ -32,30 +33,30 @@
 
 	function formatDate(ts) {
 		if (!ts?.toDate) return '';
-		return ts.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+		return ts.toDate().toLocaleDateString($locale === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short' });
 	}
 
 	async function handleDelete(e, project) {
 		e.preventDefault();
 		e.stopPropagation();
-		const confirmed = confirm(`Delete "${project.title}"? This cannot be undone.`);
+		const confirmed = confirm($t.dashboard.deleteConfirm(project.title));
 		if (!confirmed) return;
 		deletingId = project.id;
 		try {
 			await deleteProject(project.id);
 		} catch (err) {
-			alert('Failed to delete: ' + err.message);
+			alert($t.dashboard.deleteFailed + err.message);
 		} finally {
 			deletingId = null;
 		}
 	}
 </script>
 
-<Topbar title="My Papers" breadcrumb={['Dashboard']}>
+<Topbar title={$t.dashboard.title} breadcrumb={[$t.common.dashboard]}>
 	<svelte:fragment slot="actions">
 		<a href="/new" class="btn-primary-md">
 			<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-			New Paper
+			{$t.dashboard.newPaper}
 		</a>
 	</svelte:fragment>
 </Topbar>
@@ -68,17 +69,17 @@
 					<circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.5" />
 					<path d="M16 16L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
 				</svg>
-				<input class="text-input pl-11" placeholder="Search papers..." bind:value={search} />
+				<input class="text-input pl-11" placeholder={$t.dashboard.searchPlaceholder} bind:value={search} />
 			</div>
 		</div>
 	</div>
 
 	{#if loading}
-		<p class="py-16 text-center text-theme-sm text-gray-400">Loading papers...</p>
+		<p class="py-16 text-center text-theme-sm text-gray-400">{$t.dashboard.loadingPapers}</p>
 	{:else if filtered.length === 0}
 		<div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-20 text-center dark:border-gray-700">
-			<p class="text-sm font-medium text-gray-700 dark:text-gray-300">No papers yet</p>
-			<p class="mt-1 text-theme-sm text-gray-400">Click "New Paper" to get started.</p>
+			<p class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t.dashboard.noPapers}</p>
+			<p class="mt-1 text-theme-sm text-gray-400">{$t.dashboard.noPapersHint}</p>
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -90,7 +91,7 @@
 					<button
 						type="button"
 						class="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-opacity hover:bg-error-50 hover:text-error-500 group-hover:opacity-100 dark:hover:bg-error-500/[0.12]"
-						title="Delete paper"
+						title={$t.dashboard.deletePaper}
 						disabled={deletingId === p.id}
 						on:click={(e) => handleDelete(e, p)}
 					>
@@ -110,7 +111,7 @@
 					<div class="mt-auto space-y-3">
 						<div>
 							<div class="mb-1 flex items-center justify-between text-theme-xs text-gray-500 dark:text-gray-400">
-								<span>Draft progress</span>
+								<span>{$t.dashboard.draftProgress}</span>
 								<span>{p.progress ?? 0}%</span>
 							</div>
 							<div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.06]">

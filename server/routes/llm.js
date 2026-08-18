@@ -81,12 +81,27 @@ router.post('/generate-paper', requireAuth, async (req, res) => {
 	}
 
 	const template = await getPromptTemplate(project.docType);
-	const sectionListForPrompt = sections.map((s) => `"${s.id}": "${s.label}"`).join(', ');
 	const wordRange = template.sectionWordRange || { min: 150, max: 350 };
+	const sectionTemplates = template.sectionTemplates || {};
+
+	// Untuk tiap section, tentukan instruksinya: kalau ada sectionTemplates
+	// (kalimat wajib IEEE dengan {{placeholder}}), suruh model ISI
+	// placeholder-nya saja tanpa mengubah kalimat di luar itu. Kalau tidak
+	// ada, tetap free-form seperti sebelumnya.
+	const sectionInstructions = sections
+		.map((s) => {
+			if (sectionTemplates[s.id]) {
+				return `- "${s.id}" (${s.label}): Use EXACTLY this sentence template, filling only the {{...}} placeholders based on the research context. Do not alter any text outside the {{...}} markers:\n  """\n  ${sectionTemplates[s.id]}\n  """`;
+			}
+			return `- "${s.id}" (${s.label}): Write a free-form academic paragraph (${wordRange.min}-${wordRange.max} words) for this section.`;
+		})
+		.join('\n\n');
+
+	const impactNote = template.impactStatementGuidance ? `\nIf a section is named or clearly corresponds to an "Impact Statement", follow this guidance instead of the rules above: ${template.impactStatementGuidance}\n` : '';
 
 	const prompt = `${template.systemInstruction}
 
-Write a COMPLETE research paper draft, one paragraph per section, based STRICTLY on the research context below.
+Write a COMPLETE research paper draft, based STRICTLY on the research context below.
 
 ${formatContextForPrompt(project.researchContext, project.templateValues)}
 
@@ -96,10 +111,12 @@ Paper settings:
 - Write in: ${project.language || 'English'}
 
 ${template.consistencyRules}
+${impactNote}
+Now write each of the following sections:
 
-Write one well-developed academic paragraph (${wordRange.min}-${wordRange.max} words) for EACH of these sections: {${sectionListForPrompt}}.
+${sectionInstructions}
 
-Respond ONLY with valid JSON, no markdown fences, where each key is the exact section id given above and each value is that section's paragraph text. Example shape:
+Respond ONLY with valid JSON, no markdown fences, where each key is the exact section id given above and each value is that section's final text (with placeholders already filled in, if it had a template). Example shape:
 {"abstract": "...", "intro": "..."}`;
 
 	let parsed;
